@@ -2,7 +2,9 @@
 Reinforcement Learning–Based Autonomous Gameplay in Super Mario Bros Using Computer Vision for Real-Time State Understanding
 
 This is a project for the course Practical Applications of AI at The Faculty of Electrical Engineering of University of Sarajevo.
+
 The students that are working on this project are: Muhamed Avdić, Mak Mičijević, Enis Džinović and Hamza Marić
+
 The goal of this project are evolving as the project is being worked on and as we discover what is practically achievable.
 
 
@@ -43,6 +45,7 @@ Training two models also will be a challenge considering this is our first time 
 value to RL models by investigating if OpenCV can be used in a creative way to speed up the learning process.
 
 Resources:
+
 https://github.com/Kautenja/gym-super-mario-bros - the main library for the RL enviorment
 https://medium.com/@simeetnayan81/training-an-agent-to-play-breakout-using-deep-reinforcement-learning-b5ca02c81182 - extracting information on how an agent works and how we should go about implementing them
 PyTorch - RL algorithms, DQN
