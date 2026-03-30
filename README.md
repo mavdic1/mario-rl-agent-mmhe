@@ -7,12 +7,20 @@ The students that are working on this project are: Muhamed Avdić, Mak Mičijevi
 
 The goal of this project are evolving as the project is being worked on and as we discover what is practically achievable.
 
+---
+
+# Problem definiton and goal
 
 Reinforcement learning agents often struggle to efficiently learn from raw game frames because the input is high-dimensional and contains irrelevant information.
 This slows training and reduces performance.
 
 The current aim is to develop a reinforcement learning (RL) agent capable of playing Super Mario Bros using a combination of modern RL techniques
 and computer vision preprocessing as a means of improving the training process.
+
+---
+
+# Steps we need to take
+
 
 The first step would be implementing a Deep Q-Network (DQN) agent using a Python library gym-super-mario-bros as the RL environment.
 
@@ -29,6 +37,8 @@ one using raw game frames, and one using OpenCV-processed frames.
 
 Final step would be comparing these agents in terms of learning speed, the score the models achieve in game, and overall stability.
 
+---
+
 The steps in a more concise format would be:
 1. Set up the gym-super-mario-bros environment
 2. Implement a Deep Q-Network agent
@@ -37,6 +47,9 @@ The steps in a more concise format would be:
 5. Compare results: learning speed, score, stability
 6. Analyze and summarize findings
 
+---
+
+# Challenges
 
 Some challenges we are expecting are the training of the model can be quite slow,
 deciding and optimizing how OpenCV processes the data inorder not to lose important features or make training longer and more difficult.
@@ -44,7 +57,9 @@ deciding and optimizing how OpenCV processes the data inorder not to lose import
 Training two models also will be a challenge considering this is our first time tackling deep learning but we hope we can learn and add
 value to RL models by investigating if OpenCV can be used in a creative way to speed up the learning process.
 
-Resources:
+---
+
+# Resources
 
 https://github.com/Kautenja/gym-super-mario-bros - the main library for the RL enviorment
 https://medium.com/@simeetnayan81/training-an-agent-to-play-breakout-using-deep-reinforcement-learning-b5ca02c81182 - extracting information on how an agent works and how we should go about implementing them
