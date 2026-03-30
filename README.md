@@ -61,9 +61,10 @@ value to RL models by investigating if OpenCV can be used in a creative way to s
 
 # Resources
 
-https://github.com/Kautenja/gym-super-mario-bros - the main library for the RL enviorment
-https://medium.com/@simeetnayan81/training-an-agent-to-play-breakout-using-deep-reinforcement-learning-b5ca02c81182 - extracting information on how an agent works and how we should go about implementing them
-PyTorch - RL algorithms, DQN
-OpenCV – computer vision library for frame preprocessing
-NumPy / Pandas – for data manipulation
-Matplotlib / Seaborn – for plotting training progress and results
+https://github.com/Kautenja/gym-super-mario-bros - the main library for the RL enviorment  
+https://medium.com/@simeetnayan81/training-an-agent-to-play-breakout-using-deep-reinforcement-learning-b5ca02c81182 - extracting information on how an agent works and how we should go about implementing them  
+PyTorch - RL algorithms, DQN  
+OpenCV – computer vision library for frame preprocessing  
+NumPy / Pandas – for data manipulation  
+Matplotlib / Seaborn – for plotting training progress and results  
+ 
