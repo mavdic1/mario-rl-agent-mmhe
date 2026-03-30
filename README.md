@@ -1,4 +1,4 @@
-# mario-rl-agen-mmhe
+# mario-rl-agent-mmhe
 Reinforcement Learning–Based Autonomous Gameplay in Super Mario Bros Using Computer Vision for Real-Time State Understanding
 
 This is a project for the course Practical Applications of AI at The Faculty of Electrical Engineering of University of Sarajevo.
