@@ -68,3 +68,241 @@ OpenCV – computer vision library for frame preprocessing
 NumPy / Pandas – for data manipulation  
 Matplotlib / Seaborn – for plotting training progress and results  
  
+
+Here is an updated **fully copy-paste safe `README.md`** with **detailed setup steps** added (clean formatting, no special UI blocks, no rendering issues):
+
+---
+
+# Mario RL Agent (PPO + Retro Gym)
+
+
+# 1. Project Overview
+
+The agent learns to play Mario using:
+
+* PPO (Stable-Baselines3)
+* Custom Gym environment (MarioEnv)
+* Frame stacking (4 grayscale frames, 84x84)
+* Reward shaping based on horizontal progress (x_pos)
+* Parallel environments (SubprocVecEnv)
+
+---
+
+# 2. Full Setup Guide (From Zero)
+
+## Step 1: Install system dependencies
+
+On Fedora (or similar Linux):
+
+sudo dnf install -y python3 python3-pip git cmake gcc gcc-c++
+
+You also need OpenGL support:
+
+sudo dnf install -y mesa-libGL mesa-libGLU
+
+---
+
+## Step 2: Project setup
+
+git clone [https://github.com/mavdic1/mario-rl-agent-mmhe.git](https://github.com/mavdic1/mario-rl-agent-mmhe.git)
+cd mario-rl-agent-mmhe
+
+# Create Python environment (recommended)
+
+conda create -n mario python=3.8
+conda activate mario
+
+pip install -r requirements.txt
+
+---
+
+## Step 3: Import Retro games
+
+This step is REQUIRED.
+
+python -m retro.import .
+
+This scans and registers ROMs.
+
+You must have:
+
+SuperMarioBros-Nes
+Level1-1
+
+If missing, Retro will fail.
+
+---
+
+## Step 4: Verify environment works
+
+Run Python:
+
+python
+
+Then:
+
+import retro
+env = retro.make(game="SuperMarioBros-Nes", state="Level1-1")
+obs = env.reset()
+print(obs.shape)
+
+If this works, setup is correct.
+
+---
+
+# 3. Project Structure
+
+mario-rl-agent-mmhe/
+
+├── mario_env.py        # Custom environment wrapper
+├── train.py            # PPO training script
+├── play.py             # Run trained agent
+│
+├── models/             # Saved checkpoints (auto-created)
+└── mario_ppo.zip       # Final trained model
+
+---
+
+# 4. Training the Agent
+
+Run training:
+
+python train.py
+
+What happens:
+
+* Uses 4 parallel environments
+* PPO with CNN policy
+* GPU acceleration if available
+* Saves models every 50,000 steps
+
+Saved models:
+
+models/mario_ppo_0
+models/mario_ppo_50000
+models/mario_ppo_100000
+...
+
+---
+
+# 5. Playing the Trained Model
+
+Run:
+
+python play.py
+
+It will:
+
+* Load mario_ppo.zip
+* Run deterministic policy
+* Render gameplay
+* Reset automatically on death
+
+---
+
+# 6. Observation Space
+
+Shape:
+
+(4, 84, 84)
+
+Meaning:
+
+* 4 stacked grayscale frames
+* 84x84 resolution
+
+---
+
+# 7. Action Space
+
+Uses Retro action space:
+
+* Left
+* Right
+* Jump
+* Run
+* Button combinations
+
+---
+
+# 8. Reward System
+
+Current reward:
+
+reward += x_pos * 0.001
+
+This encourages forward movement.
+
+---
+
+# 9. Performance Tips (IMPORTANT)
+
+For faster training on RTX 3050:
+
+* Increase NUM_ENVS (4 → 6 or 8 if CPU allows)
+* Use GPU (device="cuda")
+* Keep n_steps = 1024 or higher
+* Avoid rendering during training
+* Close background apps
+
+---
+
+# 10. Saving Models
+
+Auto-save is enabled:
+
+SAVE_EVERY = 50000
+
+You can adjust this in train.py.
+
+---
+
+# 11. Resume Training
+
+To resume from checkpoint:
+
+from stable_baselines3 import PPO
+
+model = PPO.load("models/mario_ppo_50000", env=env)
+
+---
+
+# 12. Common Issues
+
+## SubprocVecEnv crash
+
+Must always use:
+
+if **name** == "**main**":
+
+## Retro errors
+
+Run:
+
+python -m retro.import .
+
+## CNN policy errors
+
+Ensure observation shape is:
+
+(4, 84, 84)
+
+---
+
+# 13. Future Improvements
+
+* Frame skipping (big speed boost)
+* Better reward shaping (survival + distance)
+* LSTM memory policy
+* Curriculum learning (Level 1 → harder levels)
+* Action repeat optimization
+
+---
+
+# 14. Run Order
+
+1. python train.py
+2. python play.py
+
+---
+
