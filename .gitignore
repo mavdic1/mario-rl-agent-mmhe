@@ -5,3 +5,4 @@ __pycache__/
 *.zip
 Miniconda3*.sh
 miniconda*.sh
+*.nes
