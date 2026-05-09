@@ -97,6 +97,10 @@ cd mario-rl-agent-mmhe
 conda create -n mario python=3.8
 conda activate mario
 
+python -m pip install "pip<24.1"
+
+Restart conda
+
 pip install -r requirements.txt
 
 ---

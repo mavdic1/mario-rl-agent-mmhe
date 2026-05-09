@@ -17,7 +17,7 @@ from logger import get_logger
 # =========================================================
 
 NUM_ENVS = 10
-TOTAL_TIMESTEPS = 5_000_000
+TOTAL_TIMESTEPS = 10_000_000
 EVAL_FREQ = 250_000
 
 MODEL_DIR = "models/"
