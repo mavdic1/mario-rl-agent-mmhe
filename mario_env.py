@@ -4,9 +4,12 @@ import retro
 from gym import spaces
 import cv2
 
+cv2.setNumThreads(0)
+
 class MarioEnv(gym.Env):
-    def __init__(self):
+    def __init__(self, version="v2"):
         super().__init__()
+        self.version = version
         self.env = retro.make(game="SuperMarioBros-Nes", state="Level1-1")
         
         # Action Set
@@ -20,7 +23,7 @@ class MarioEnv(gym.Env):
             [0, 0, 0, 0, 0, 0, 1, 0, 0], # 6: Left
         ]
         self.action_space = spaces.Discrete(len(self._actions))
-        self.observation_space = spaces.Box(low=0, high=255, shape=(4, 84, 84), dtype=np.uint8)
+        self.observation_space = spaces.Box(low=0, high=255, shape=(1, 84, 84), dtype=np.uint8)
         
         self.frame_stack = []
         self.max_x = 0
@@ -62,32 +65,55 @@ class MarioEnv(gym.Env):
             return 0, 0, False, False
 
     def preprocess(self, obs):
+        # 1. Faster Sky Masking (Avoiding HSV conversion)
+        # In NES Mario, the sky blue has a very high Blue value (255) 
+        # compared to Red/Green. This is 10x faster than HSV conversion.
+        # Logic: If Blue > 240, it's sky.
+        sky_mask = obs[:, :, 2] > 240
+        obs[sky_mask] = 0
+
+        # 2. ROI Crop (Do this BEFORE Canny/Resize to process fewer pixels)
+        # Reducing the height from 240 to 184 pixels immediately saves 25% CPU
+        obs = obs[40:224, 0:256]
+
+        # 3. Grayscale (Fast)
         gray = cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
-        return cv2.resize(gray, (84, 84), interpolation=cv2.INTER_NEAREST)
+
+        # 4. Optimized Canny
+        # Canny is slow. If you don't NEED the lines for your thesis, 
+        # a simple threshold is much faster. 
+        # But if you want to keep Canny, use these settings:
+        gray = cv2.Canny(gray, 100, 200)
+
+        # 5. Resize (Fast)
+        # Use INTER_NEAREST instead of INTER_AREA. 
+        # For a thesis, it preserves sharp lines better anyway.
+        resized = cv2.resize(gray, (84, 84), interpolation=cv2.INTER_NEAREST)
+
+        return np.expand_dims(resized, axis=0).astype(np.uint8)
+
+    def preprocess_old(self, obs):
+        gray = cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
+        resized = cv2.resize(gray, (84, 84), interpolation=cv2.INTER_NEAREST)
+        # Return with a channel dimension for SB3
+        return np.expand_dims(resized, axis=0)
 
     def reset(self):
-        # 1. Hardware Reset
         obs = self.env.reset()
-        
-        # 2. CLEAR TRACKERS IMMEDIATELY
         self.max_x = 0
         self.prev_x = 0
         self.stuck_timer = 0
         
-        # 3. Buffer Period (Let the level load fully)
-        for _ in range(10):
+        # Wait for loading screen to pass
+        for _ in range(40):
             obs, _, _, _ = self.env.step([0]*9)
         
-        # 4. Get Actual Start Position after buffer
         x_start, time_left, _, _ = self.get_ram_stats()
         self.prev_x = x_start
-        self.max_x = x_start  # Now we know for sure where we are
+        self.max_x = x_start
         self.prev_time = time_left
         
-        # 5. Prepare Frame Stack
-        processed = self.preprocess(obs)
-        self.frame_stack = [processed for _ in range(4)]
-        return np.array(self.frame_stack, dtype=np.uint8)
+        return self.preprocess_old(obs) if self.version == "v1" else self.preprocess(obs)
 
     def step(self, action_idx):
         x0 = self.prev_x
@@ -116,11 +142,14 @@ class MarioEnv(gym.Env):
             reward = float(v + c)
             
             # Update Milestone (ONLY IF ALIVE)
-            if x1 > self.max_x:
-                self.max_x = x1
+            if x1 > self.max_x or is_finished or c1 == 0:
+                self.max_x = max(self.max_x, x1)
                 self.stuck_timer = 0
             else:
-                self.stuck_timer += 1
+                # Only increment if the clock is actually ticking 
+                # (prevents timing out on black screens)
+                if c1 < c0: 
+                    self.stuck_timer += 1
 
         # 4. Finalize
         reward = max(min(reward, 15.0), -15.0)
@@ -132,15 +161,13 @@ class MarioEnv(gym.Env):
         if is_finished:
             reward = 15.0
             done = True
-
-        processed = self.preprocess(obs)
-        self.frame_stack.pop(0)
-        self.frame_stack.append(processed)
-        stacked_obs = np.array(self.frame_stack, dtype=np.uint8)
         
         # This info goes to the callback for the progress bar
         info["max_x"] = self.max_x
-        return stacked_obs, reward, done, info
+        info["stuck_timer"] = self.stuck_timer
+
+        p_obs = self.preprocess_old(obs) if self.version == "v1" else self.preprocess(obs)
+        return p_obs, reward, done, info
     
     def render(self, mode='human'):
         return self.env.render()

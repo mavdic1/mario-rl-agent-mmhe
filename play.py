@@ -1,7 +1,9 @@
 import time
 import os
 import argparse
+import numpy as np
 from stable_baselines3 import PPO
+from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack
 from mario_env import MarioEnv
 from logger import get_logger
 
@@ -28,7 +30,10 @@ def main():
     args = parser.parse_args()
 
     logger = get_logger("PLAY", "play.log")
-    env = MarioEnv()
+    
+    # --- CRITICAL CHANGE: Wrap the environment ---
+    # The model expects a stack of 4 frames (4, 84, 84)
+    env = VecFrameStack(DummyVecEnv([lambda: MarioEnv()]), n_stack=4)
     
     try:
         model = load_selected_model(env, args.mode)
@@ -52,11 +57,16 @@ def main():
                 # Predict action
                 action, _ = model.predict(obs, deterministic=True)
                 
-                # Step
-                obs, reward, done, info = env.step(action)
+                # Step (VecEnv returns arrays, so we take index 0)
+                obs, reward, done_array, info_array = env.step(action)
+                
+                reward = reward[0]
+                done = done_array[0]
+                info = info_array[0]
+                
                 total_reward += reward
                 
-                # Render
+                # Render the inner retro environment
                 env.render()
                 time.sleep(0.01)
 
@@ -75,6 +85,7 @@ def main():
             print(f"\nEpisode {episode} Finished")
             print(f"Max Distance: {final_x}")
             print(f"Total Reward: {total_reward:.2f}")
+            print(f"Duration: {duration:.1f}s")
             print(f"\n")
             
             episode += 1

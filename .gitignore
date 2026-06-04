@@ -1,6 +1,7 @@
 models/
 logs/
 __pycache__/
+study/
 *.pyc
 *.zip
 Miniconda3*.sh
