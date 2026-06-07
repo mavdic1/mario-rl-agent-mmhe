@@ -6,7 +6,7 @@ from src.agent.config import TOTAL_TIMESTEPS
 
 # CONFIGURATION
 VERSIONS = ["v1", "v2"]
-SEEDS = range(2)  # 0 to 9
+SEEDS = range(9)  # 0 to 9
 
 def check_if_done(version, seed):
     """

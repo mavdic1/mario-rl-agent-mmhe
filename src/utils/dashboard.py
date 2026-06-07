@@ -90,9 +90,14 @@ def show_mario_dashboard(obs, infos, rewards, actions, model, num_timesteps, ver
     cv2.putText(canvas, f"REW: {rew:.1f}", (200, 435), 0, 0.5, (255, 255, 255), 1)
 
     # Progress Bar (Yellow)
-    progress = min(curr_x / 3200, 1.0)
+    progress = min(curr_x / 6400, 1.0) 
     cv2.rectangle(canvas, (200, 445), (530, 455), (50, 50, 50), -1)
     cv2.rectangle(canvas, (200, 445), (200 + int(330 * progress), 455), (0, 255, 255), -1)
+    
+    # Add Level text to Dashboard
+    world = info.get("world", 1)
+    lvl = info.get("level", 1)
+    cv2.putText(canvas, f"LVL: {world}-{lvl}", (250, 35), 0, 0.5, (255, 255, 255), 1)
 
     # --- DISPLAY ---
     cv2.imshow(f"Mario AI Dashboard - {version.upper()}", canvas)

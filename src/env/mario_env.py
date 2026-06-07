@@ -8,6 +8,8 @@ from src.env.wrappers import preprocess, preprocess_old
 
 cv2.setNumThreads(0)
 
+GLOBAL_X=0
+
 class MarioEnv(gym.Env):
     def __init__(self, version="v2"):
         super().__init__()
@@ -76,6 +78,10 @@ class MarioEnv(gym.Env):
             return 0, 0, False, False, 1, 1
 
     def reset(self):
+        # We reset the global tracker whenever a new episode (death/start) begins
+        global GLOBAL_X
+        GLOBAL_X = 0
+
         obs = self.env.reset()
         for _ in range(40):
             obs, _, _, _ = self.env.step([0]*9)
@@ -87,12 +93,12 @@ class MarioEnv(gym.Env):
         self.prev_time = time_left
         self.prev_world = w_start
         self.prev_level = l1_start
-
         self.stuck_timer = 0 
         
         return preprocess_old(obs) if self.version == "v1" else preprocess(obs)
 
     def step(self, action_idx):
+        global GLOBAL_X
         x0 = self.prev_x
         c0 = self.prev_time
         done = False
@@ -107,47 +113,45 @@ class MarioEnv(gym.Env):
         # 2. Get Stats
         x1, c1, is_dying, is_finished, w1, l1 = self.get_ram_stats()
 
+        # Detection of level transition (e.g. moving from 1-1 to 1-2)
         if w1 != self.prev_world or l1 != self.prev_level:
+            # Save the final X of the previous level to the global variable
+            # before max_x resets to the new level's starting position
+            GLOBAL_X += self.prev_x
+            
             self.max_x = x1
             self.stuck_timer = 0
             self.prev_world = w1
             self.prev_level = l1
 
-        # 3. Reward & Milestone Logic (REFACTORED)
+        # 3. Reward & Milestone Logic
         if is_dying:
             reward = -15.0
             done = True
         else:
-            # v = current x minus the previous max x 
-            # This ensures he only gets rewards for NEW ground covered
             v = x1 - x0
             c = c1 - c0
             reward = float(v + c)
             
-            # Update Milestone (ONLY IF ALIVE)
             if x1 > self.max_x or is_finished:
                 self.max_x = x1
-                self.stuck_timer = 0 # Reset timer because progress was made
+                self.stuck_timer = 0 
             else:
-                # Increment every step if no new distance is covered
-                # We check c1 > 0 to ensure the level has actually started 
-                # (prevents timing out on the 'World 1-1' black screen)
                 if c1 > 0:
                     self.stuck_timer += 1
 
-        # 4. Finalize
         reward = max(min(reward, 15.0), -15.0)
         self.prev_x = x1
         self.prev_time = c1
 
-        if self.stuck_timer > 250: # Stuck for 250 skipped steps
+        if self.stuck_timer > 250:
             done = True
         if is_finished:
             reward = 15.0
             done = True
         
-        # This info goes to the callback for the progress bar
-        info["max_x"] = self.max_x
+        # We report GLOBAL_X (sum of all completed levels) + self.max_x (progress in current level)
+        info["max_x"] = GLOBAL_X + self.max_x
         info["stuck_timer"] = self.stuck_timer
         info["is_finished"] = is_finished
 

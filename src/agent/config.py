@@ -3,12 +3,13 @@ from pathlib import Path
 # System Settings
 NUM_ENVS = 12
 EVAL_FREQ = 250_000
-TOTAL_TIMESTEPS = 20_000_000
+TOTAL_TIMESTEPS = 10_000_000
+
 EVAL_EPISODES = 10
 
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = ROOT_DIR / "data"
-STUDY_DIR = DATA_DIR / "study"
+STUDY_DIR = DATA_DIR / "study"  
 
 # PPO Hyperparameters
 PPO_CONFIG = {
@@ -24,6 +25,19 @@ PPO_CONFIG = {
     "max_grad_norm": 0.5,
     "target_kl": 0.03,
 }
+
+CSV_COLUMNS = [
+    "step", 
+    "elapsed_time_sec", 
+    "mean_reward", 
+    "std_reward", 
+    "mean_x", 
+    "std_x", 
+    "peak_x", 
+    "max_level",      # <--- This was missing from your header
+    "win_rate_pct", 
+    "eval_episodes"
+]
 
 def get_study_paths(version, seed):
     base = STUDY_DIR / version / f"seed_{seed}"
