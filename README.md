@@ -31,8 +31,7 @@
     - [Visual Pipeline Logic](#visual-preprocessing-pipeline)
 9. [Troubleshooting](#troubleshooting)
 10. [Further Improvements](#further-improvements)
-11. [Conclusion](#conclusion)
-12. [License](#license)
+11. [Conclusion](#conclusion)   
 
 ---
 
@@ -601,6 +600,3 @@ The 20% slowdown in V2 is caused by the CPU handling OpenCV filters for 12 paral
 Looking at the data, it’s clear that the grayscale baseline (V1) struggled to make sense of the game's background noise. By stripping out the sky and using edge detection in V2, we bypassed the part where the CNN has to learn basic feature extraction from scratch. This significantly sped up the learning process and helped the agent converge on a winning strategy much sooner.
 
 Even though V2 had more "swing" between different seeds, the performance floor was much higher across the board. The fact that the weakest V2 agent still outperformed the top V1 agent shows that the vision pipeline is doing most of the heavy lifting. The main takeaway here is that manual feature engineering still has a huge place in Reinforcement Learning, especially when you are limited by hardware or time.
-
-# License
-This project is licensed under the MIT License. You are free to use, copy, and modify the software for any purpose.
