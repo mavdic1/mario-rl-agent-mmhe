@@ -64,7 +64,8 @@ All training was done on a single workstation with the following hardware specif
 | **OS** | Fedora Linux 44 (Workstation Edition) |
 | **Driver** | NVIDIA CUDA 12.x compatible |
 
-The raw evaluation logs and data points used for this analysis are available in the docs/ folder of this repository. The trained models are not included here.
+The raw evaluation logs and data points used for this analysis are available in the docs/ folder of this repository. The trained models are available using the following link:
+[Data with models](https://drive.google.com/drive/folders/1MQ2OQNkAZVwlMSBL0KUh2ChG3cpPUPKE?usp=drive_link)
  
 This comparative study involved 20 independent training runs of 5 million steps each. By comparing 10 random seeds across both versions, we gathered 100 million environment interactions. The resulting data confirms that the visual preprocessing pipeline in Version 2 significantly accelerates learning.
 
