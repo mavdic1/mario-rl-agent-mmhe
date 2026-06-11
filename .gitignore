@@ -7,3 +7,5 @@ study/
 Miniconda3*.sh
 miniconda*.sh
 *.nes
+*.html
+*.pdf

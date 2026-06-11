@@ -32,23 +32,26 @@ class MarioCallback(BaseCallback):
 
         self.start_time = time.time()
 
+        # Initialize storage directory and history file
         os.makedirs(log_dir, exist_ok=True)
         self.results_csv = os.path.join(log_dir, "eval_history.csv")
 
         self.best_mean_x = self._recover_best_mean_x()
 
+        # Separate environment for periodic performance testing
         self.eval_env = VecFrameStack(
             DummyVecEnv([lambda: MarioEnv(version=self.version)]), 
             n_stack=4
         )
 
+        # Create CSV and write header if file is new
         if not os.path.exists(self.results_csv):
             with open(self.results_csv, "w", newline="") as f:
                 writer = csv.writer(f)
                 writer.writerow(CSV_COLUMNS)
 
     def _recover_best_mean_x(self):
-        """Finds the historical best mean_x from CSV to ensure safe resuming."""
+        # Scan historical logs to find the highest mean_x for safe resuming
         if os.path.exists(self.results_csv):
             try:
                 df = pd.read_csv(self.results_csv)
@@ -61,9 +64,11 @@ class MarioCallback(BaseCallback):
         return 0
 
     def _on_step(self) -> bool:
-
+        # Update training progress bar
         self.pbar.update(self.training_env.num_envs)
 
+        # Render dashboard visualizer if not in headless mode
+        # Should not be used while training, only for debugging as it greatly reduces performance
         if not self.headless:
             show_mario_dashboard(
                 obs=self.locals.get("new_obs"),
@@ -75,6 +80,7 @@ class MarioCallback(BaseCallback):
                 version=self.version
             )
 
+        # Update progress bar metrics with current live data
         infos = self.locals.get("infos", [])
 
         if infos:
@@ -87,6 +93,7 @@ class MarioCallback(BaseCallback):
                 "Best_X": f"{self.best_mean_x:.1f}"
             })
 
+        # Trigger evaluation and save model at defined intervals
         if self.model.num_timesteps - self.last_eval >= EVAL_FREQ:
             self.last_eval = self.model.num_timesteps
             self.evaluate()
@@ -95,13 +102,7 @@ class MarioCallback(BaseCallback):
         return True
 
     def evaluate(self):
-        """
-        Runs a set of evaluation episodes to measure agent progress.
-        Logic: 
-        - Calculates mean/std of Reward and Global X.
-        - Identifies the furthest World-Level reached.
-        - Records results to a 10-column CSV.
-        """
+        # Measure agent performance across multiple episodes
         eval_rewards = []
         eval_xs = []
         reached_levels = []
@@ -116,49 +117,43 @@ class MarioCallback(BaseCallback):
             ep_max_x = 0
             ep_best_lvl = "1-1"
             steps = 0
-            
-            # Run one episode
-            while not done and steps < 10000: # 10k step safety ceiling
-                # Predict action (Deterministic=False allows for exploration/variation)
+            ep_won = False
+
+            while not done and steps < 10000:
                 action, _ = self.model.predict(obs, deterministic=False)
                 obs, reward, done_array, info_array = self.eval_env.step(action)
                 
                 info = info_array[0]
                 ep_ret += reward[0]
                 
-                # Global X logic: 
-                # This uses the cumulative distance calculated in mario_env.py
+                if info.get("is_finished", False):
+                    ep_won = True
+                
                 curr_x = info.get("max_x", 0)
                 if curr_x > ep_max_x: 
                     ep_max_x = curr_x
-                    # Store which level we were in when we hit this new peak
                     ep_best_lvl = f"{info.get('world', 1)}-{info.get('level', 1)}"
-                
-                # Check for flag pole or level completion
-                if info.get("is_finished", False):
-                    wins += 1
-                    done = True
                 
                 done = done or done_array[0]
                 steps += 1
 
+            if ep_won:
+                wins += 1
+            
             eval_rewards.append(ep_ret)
             eval_xs.append(ep_max_x)
             reached_levels.append(ep_best_lvl)
 
-        # --- 1. STATISTICS CALCULATION ---
+        # Calculate metrics and identify the most frequent level reached
         m_reward, s_reward = np.mean(eval_rewards), np.std(eval_rewards)
         m_x, s_x = np.mean(eval_xs), np.std(eval_xs)
         peak_x = np.max(eval_xs) # Absolute record distance in this session
         wr = (wins / num_episodes) * 100
         elapsed = int(time.time() - self.start_time)
         
-        # Calculate the "Mode" level (the level reached most frequently)
         best_level_str = max(set(reached_levels), key=reached_levels.count)
 
-        # --- 2. CSV WRITING (10 COLUMNS) ---
-        # Header sequence in config.py MUST be:
-        # step, elapsed_time_sec, mean_reward, std_reward, mean_x, std_x, peak_x, max_level, win_rate_pct, eval_episodes
+        # Append performance statistics to the results CSV
         with open(self.results_csv, "a", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([
@@ -174,7 +169,7 @@ class MarioCallback(BaseCallback):
                 num_episodes            # 10. eval_episodes
             ])
 
-        # --- 3. LOGGING & PROGRESS ---
+        # Log summary to console and save best model if mean distance improves
         self.logger.info(
             f"EVAL | Step: {self.num_timesteps} | "
             f"Mean X: {int(m_x)} | Peak: {int(peak_x)} | "
@@ -188,13 +183,13 @@ class MarioCallback(BaseCallback):
                 "Lvl": best_level_str
             })
 
-        # --- 4. MODEL SAVING (Based on Mean Distance) ---
         if m_x > self.best_mean_x:
             self.best_mean_x = m_x
             self.model.save(self.best_path)
             self.logger.info(f"--> NEW BEST DISTANCE MODEL SAVED: {int(m_x)} ({best_level_str})")
 
     def _on_training_start(self):
+        # Initialize terminal progress bar
         self.pbar = tqdm(
             total=self.total_timesteps,
             desc="Training Mario",
@@ -206,6 +201,7 @@ class MarioCallback(BaseCallback):
         self.last_eval = self.model.num_timesteps
 
     def _on_training_end(self):
+        # Clean up progress bar and evaluation resources
         if self.pbar is not None:
             self.pbar.close()
 

@@ -7,8 +7,7 @@ import cv2
 from src.env.wrappers import preprocess, preprocess_old
 
 cv2.setNumThreads(0)
-
-GLOBAL_X=0
+# GLOBAL_X=0 Outdated 
 
 class MarioEnv(gym.Env):
     def __init__(self, version="v2"):
@@ -16,7 +15,7 @@ class MarioEnv(gym.Env):
         self.version = version
         self.env = retro.make(game="SuperMarioBros-Nes", state="Level1-1")
         
-        # Action Set
+        # Mapping discrete actions to NES button combinations
         self._actions = [
             [0, 0, 0, 0, 0, 0, 0, 0, 0], # 0: NOOP
             [0, 0, 0, 0, 0, 0, 0, 1, 0], # 1: Right
@@ -29,13 +28,14 @@ class MarioEnv(gym.Env):
         self.action_space = spaces.Discrete(len(self._actions))
         self.observation_space = spaces.Box(low=0, high=255, shape=(1, 84, 84), dtype=np.uint8)
         
+        self.global_x = 0 # Tracks horizontal progress across level transitions
         self.frame_stack = []
-        self.max_x = 0
+        self.max_x = 0 #
         self.prev_x = 0
-        self.prev_time = 0 # Track time for 'c' calculation
+        self.prev_time = 0
         self.stuck_timer = 0
         
-        # Core RAM Addresses
+        # RAM Address Map
         self.ADDR_X_PAGE    = 0x006D
         self.ADDR_X_POS     = 0x0086
         self.ADDR_TIME_H    = 0x07F8 # Clock Hundreds
@@ -51,13 +51,13 @@ class MarioEnv(gym.Env):
         self.prev_level     = 1
 
     def get_ram_stats(self):
+        # Reads game state directly from NES memory
         try:
             ram = self.env.get_ram()
             # X Position
             x_pos = int(ram[self.ADDR_X_PAGE]) * 256 + int(ram[self.ADDR_X_POS])
             
-            # Clock (Time Left)
-            # Mario clock is BCD-ish, stored as digits
+            # Time
             time_left = (int(ram[self.ADDR_TIME_H]) * 100 + 
                          int(ram[self.ADDR_TIME_T]) * 10 + 
                          int(ram[self.ADDR_TIME_U]))
@@ -79,12 +79,11 @@ class MarioEnv(gym.Env):
 
     def reset(self):
         # We reset the global tracker whenever a new episode (death/start) begins
-        global GLOBAL_X
-        GLOBAL_X = 0
+        self.global_x = 0
 
         obs = self.env.reset()
         for _ in range(40):
-            obs, _, _, _ = self.env.step([0]*9)
+            obs, _, _, _ = self.env.step([0]*9)  # Skip startup animation
 
         x_start, time_left, _, _, w_start, l1_start = self.get_ram_stats()
         
@@ -95,36 +94,42 @@ class MarioEnv(gym.Env):
         self.prev_level = l1_start
         self.stuck_timer = 0 
         
+        # Two different preprocessing method activation depending on which one we want
         return preprocess_old(obs) if self.version == "v1" else preprocess(obs)
 
     def step(self, action_idx):
-        global GLOBAL_X
         x0 = self.prev_x
         c0 = self.prev_time
         done = False
         obs = None
         info = {}
+        
+        won_this_step = False
 
-        # 1. Execute Action
+        # Execute action over 4 frames for temporal consistency
         for _ in range(4):
             obs, _, done, info = self.env.step(self._actions[action_idx])
+            _, _, _, frame_finished, _, _ = self.get_ram_stats()
+            if frame_finished:
+                won_this_step = True
+                
             if done: break
 
-        # 2. Get Stats
-        x1, c1, is_dying, is_finished, w1, l1 = self.get_ram_stats()
+        x1, c1, is_dying, is_finished_final, w1, l1 = self.get_ram_stats()
+        
+        is_finished = is_finished_final or won_this_step
 
-        # Detection of level transition (e.g. moving from 1-1 to 1-2)
+        # Handle world/level transitions
         if w1 != self.prev_world or l1 != self.prev_level:
-            # Save the final X of the previous level to the global variable
-            # before max_x resets to the new level's starting position
-            GLOBAL_X += self.prev_x
-            
-            self.max_x = x1
+            self.global_x += self.prev_x
+            self.max_x = 0
             self.stuck_timer = 0
             self.prev_world = w1
             self.prev_level = l1
+            x1 = 0
+            x0 = 0
 
-        # 3. Reward & Milestone Logic
+        # Reward logic based on speed (v) and time pressure (c)
         if is_dying:
             reward = -15.0
             done = True
@@ -146,12 +151,11 @@ class MarioEnv(gym.Env):
 
         if self.stuck_timer > 250:
             done = True
+            
         if is_finished:
             reward = 15.0
-            done = True
         
-        # We report GLOBAL_X (sum of all completed levels) + self.max_x (progress in current level)
-        info["max_x"] = GLOBAL_X + self.max_x
+        info["max_x"] = self.global_x + self.max_x
         info["stuck_timer"] = self.stuck_timer
         info["is_finished"] = is_finished
 

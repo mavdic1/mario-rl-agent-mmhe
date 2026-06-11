@@ -2,7 +2,7 @@ import subprocess
 import time
 import os
 
-from src.agent.config import TOTAL_TIMESTEPS
+from src.agent.config import TOTAL_TIMESTEPS, get_study_paths
 
 # CONFIGURATION
 VERSIONS = ["v1", "v2"]
@@ -19,9 +19,14 @@ def check_if_done(version, seed):
     return os.path.exists(done_marker)
 
 def mark_as_done(version, seed):
-    done_marker = f"study/{version}/seed_{seed}/.completed"
-    os.makedirs(os.path.dirname(done_marker), exist_ok=True)
-    with open(done_marker, "w") as f:
+    # Retrieve the standardized path from config
+    paths = get_study_paths(version, seed)
+    marker_path = paths["marker"]
+    
+    # Ensure the directory exists (data/study/v1/seed_0/)
+    os.makedirs(os.path.dirname(marker_path), exist_ok=True)
+    
+    with open(marker_path, "w") as f:
         f.write(f"Completed at {time.ctime()}")
 
 print("Starting/Resuming Comparative Study...")

@@ -1,19 +1,19 @@
 from pathlib import Path
 
-# System Settings
+# Execution settings
 NUM_ENVS = 12
 EVAL_FREQ = 250_000
-TOTAL_TIMESTEPS = 10_000_000
-
+TOTAL_TIMESTEPS = 5_000_000
 EVAL_EPISODES = 10
 
+# Directory structure
 ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = ROOT_DIR / "data"
 STUDY_DIR = DATA_DIR / "study"  
 
 # PPO Hyperparameters
 PPO_CONFIG = {
-    "learning_rate": 2.5e-4, # Initial LR
+    "learning_rate": 2.5e-4,
     "n_steps": 1024,
     "batch_size": 4096,
     "n_epochs": 4,
@@ -26,20 +26,14 @@ PPO_CONFIG = {
     "target_kl": 0.03,
 }
 
+# CSV logging schema
 CSV_COLUMNS = [
-    "step", 
-    "elapsed_time_sec", 
-    "mean_reward", 
-    "std_reward", 
-    "mean_x", 
-    "std_x", 
-    "peak_x", 
-    "max_level",      # <--- This was missing from your header
-    "win_rate_pct", 
-    "eval_episodes"
+    "step", "elapsed_time_sec", "mean_reward", "std_reward", 
+    "mean_x", "std_x", "peak_x", "max_level", "win_rate_pct", "eval_episodes"
 ]
 
 def get_study_paths(version, seed):
+    # Generates structured paths for model saves and logs
     base = STUDY_DIR / version / f"seed_{seed}"
     return {
         "models": base / "models",
@@ -50,7 +44,10 @@ def get_study_paths(version, seed):
         "marker": base / ".completed"
     }
 
+#Was not used in the final training representation,
+#but could be used or a different similar function when trainig large models
 def linear_schedule(initial_value: float):
+    # Calculates a decaying learning rate based on training progress
     def func(progress_remaining: float) -> float:
         return progress_remaining * initial_value
     return func
