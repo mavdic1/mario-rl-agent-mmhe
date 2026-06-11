@@ -50,6 +50,8 @@ Version 1 is our baseline. It sees the game in basic grayscale, which is a stand
 
 By training both versions under the exact same conditions, we can see which one performs better. We measure success by looking at the average horizontal distance Mario travels through the level. We also track how many training steps it takes to reach that distance. We run multiple tests with different random seeds to make sure our findings are consistent. This project helps show if simple computer vision techniques can be used to make complex deep learning tasks easier for an AI to handle.
 
+> NOTE: If you run the current scripts, your X-distance data might look different from the tables below. This is because our original study used a version of the code that stopped counting distance after Mario touched the flagpole in 1-1 (3150 pixels). We have since updated the code to track progress globally through the whole game. Even though the numbers have changed, the comparison between Version 1 and Version 2 remains consistent and the focus here is about mastery of level 1-1. You can still view our raw training data by pointing TensorBoard to the old_data path provided in the repository.
+
 ![Seed Breakdown Table](./docs/Images/Mario_RL_Poster2.jpg)
 
 # Study Results and Findings
@@ -64,9 +66,12 @@ All training was done on a single workstation with the following hardware specif
 | **OS** | Fedora Linux 44 (Workstation Edition) |
 | **Driver** | NVIDIA CUDA 12.x compatible |
 
-The raw evaluation logs and data points used for this analysis are available in the docs/ folder of this repository. The trained models are available using the following link:
+The raw evaluation logs and data points used for this analysis are available in the docs/ folder of this repository.
+It is also possible to view interactive charts by opening tensorboard. Just extract the .7z file and from root in the terminal run the command ```tensorboard --logdir ./docs``` and open the link shown in the terminal.
+
+The trained models are available using the following link:
 [Data with models](https://drive.google.com/drive/folders/1MQ2OQNkAZVwlMSBL0KUh2ChG3cpPUPKE?usp=drive_link)
- 
+
 This comparative study involved 20 independent training runs of 5 million steps each. By comparing 10 random seeds across both versions, we gathered 100 million environment interactions. The resulting data confirms that the visual preprocessing pipeline in Version 2 significantly accelerates learning.
 
 **Per-Seed Performance Breakdown**
