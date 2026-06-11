@@ -88,7 +88,7 @@ This table summarizes the outcome of every individual run. Version 2 achieved a 
 | **Peak X Distance Reached** | 2301 Pixels | 3052 Pixels | **+32.6%** |
 | **Mean Episode Reward** | 520 Points | 1680 Points | **+223.1%** |
 | **Level 1-1 Success Rate** | 10% (1/10 Seeds) | 70% (7/10 Seeds) | **+600%** |
-| **Total Training Time** | 1.34 Hours | 1.63 Hours | **+21.6%** |
+| **Total Training Time** | 1.34 Hours per Seed | 1.63 Hours per Seed | **+21.6%** |
 
 These figures show that Version 2 achieved a significantly higher average horizontal distance and produced seven times more level completions than the baseline. 
 
