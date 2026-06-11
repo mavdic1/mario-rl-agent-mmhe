@@ -50,7 +50,9 @@ Version 1 is our baseline. It sees the game in basic grayscale, which is a stand
 
 By training both versions under the exact same conditions, we can see which one performs better. We measure success by looking at the average horizontal distance Mario travels through the level. We also track how many training steps it takes to reach that distance. We run multiple tests with different random seeds to make sure our findings are consistent. This project helps show if simple computer vision techniques can be used to make complex deep learning tasks easier for an AI to handle.
 
-> NOTE: If you run the current scripts, your X-distance data might look different from the tables below. This is because our original study used a version of the code that stopped counting distance after Mario touched the flagpole in 1-1 (3150 pixels). We have since updated the code to track progress globally through the whole game. Even though the numbers have changed, the comparison between Version 1 and Version 2 remains consistent and the focus here is about mastery of level 1-1. You can still view our raw training data by pointing TensorBoard to the old_data path provided in the repository.
+> NOTE: If you run the current scripts, your X-distance data might look different from the tables below. This is because our original study used a version of the code that stopped counting distance after Mario touched the flagpole in 1-1 (3150 pixels). We have since updated the code to track progress globally through the whole game in hopes of gathering more meaningful data. We have unfortunatly ran out of time. Even though the numbers have changed, the comparison between Version 1 and Version 2 remains consistent and the focus of this analysis is about mastery of level 1-1. You can still view our raw training data by pointing TensorBoard to the data path provided in the repository. How to open tensorboard is also explain just below in the Study Results and Findings section.
+
+---
 
 ![Seed Breakdown Table](./docs/Images/Mario_RL_Poster2.jpg)
 
