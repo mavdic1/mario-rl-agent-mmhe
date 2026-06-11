@@ -39,7 +39,7 @@
 # Project Overview
 This project is part of a course at the Faculty of Electrical Engineering in Sarajevo. The main goal is to build an AI agent that plays Super Mario Bros using Reinforcement Learning. We are specifically investigating how computer vision can be used to simplify what the agent sees to make the training process more efficient. In many cases, these agents try to learn directly from the game screen, but the screen contains a lot of background information that the agent does not actually need to see.
 
-When an AI looks at a raw game frame, it sees every pixel and every color. For a game like Mario, things like the blue sky or small background details can act as noise. This often results in the training process taking a very long time because the agent has to figure out which pixels are important and which are not. We believe that by cleaning up these images before the AI sees them, we can make the training more stable and help the agent learn the game logic faster.
+When an AI looks at a raw game frame it encounters too much noise like the sky or text. BY cleaning up these images before the AI sees them, we can make the training more stable and help the agent learn the game logic faster.
 
 We use an algorithm called Proximal Policy Optimization (PPO) to train our models. To prove whether visual cleaning helps, we designed two different versions of the agent to compare them against each other.
 
@@ -84,14 +84,14 @@ This table summarizes the outcome of every individual run. Version 2 achieved a 
 
 These figures show that Version 2 achieved a significantly higher average horizontal distance and produced seven times more level completions than the baseline. 
 
-> **Important Finding:** Even the lowest-performing seed in the Version 2 group outperformed the highest-performing seed in the Version 1 baseline regarding average distance.
+> Even the lowest-performing seed in the Version 2 group outperformed the highest-performing seed in the Version 1 baseline regarding average distance.
 
 ### Acquisition Phase and Milestone Mastery
 
 The learning curves for both versions remained similar for the first 2 million steps. Version 2 began to learn much faster between 2.5 million and 3 million steps. By the end of the training Version 2 reached nearly twice the distance of Version 1.
 
 ![Mean X Learning Curve](./docs/Images/FinalMeanXBySeed.png)
-Comparing the final average distance across all seeds reveals that Version 2 (orange) consistently outperforms Version 1 (blue). This suggests that the advantages of visual preprocessing are robust and do not rely on a specific random initialization.
+Comparing the final average distance across all seeds reveals that Version 2 (orange) consistently outperforms Version 1 (blue).
 
 Individual seed trajectories show that Version 2 seeds consistently broke out of early plateaus, whereas Version 1 seeds remained clustered at lower distances.
 
@@ -160,58 +160,55 @@ Version 2 agents showed a sharp increase in rewards after the middle of the trai
 
 # Core Functional Documentation
 
-This section provides an in-depth technical analysis of the primary software components. It explains the logic behind memory access, the computer vision pipeline, and the automated training management systems.
+#### RAM Telemetry & State Logic (`mario_env.py`)
 
-#### RAM Telemetry and State Extraction (`mario_env.py`)
-
-The `get_ram_stats` function serves as the primary data source for the environment. It bypasses visual estimation by reading the NES console’s internal memory directly. This ensures that the rewards and termination conditions are based on 100% accurate game state data.
+Rather than estimating progress from the visual frame, we pull state data directly from the NES RAM. This eliminates the latency and inaccuracy of screen-based trackers, providing the PPO agent with pixel-perfect feedback for every horizontal move.
 
 ```python
 def get_ram_stats(self):
     ram = self.env.get_ram()
-    # Horizontal progress is split across a page byte and a position byte
+    # Progress: Combined page byte (0x006D) and position byte (0x0086)
     x_pos = int(ram[0x006D]) * 256 + int(ram[0x0086])
     
-    # The game clock is stored as individual BCD digits in memory
-    time_left = (int(ram[0x07F8]) * 100 + 
-                 int(ram[0x07F9]) * 10 + 
-                 int(ram[0x07FA]))
+    # Clock parsing: BCD digits at 0x07F8-0x07FA
+    time_left = (int(ram[0x07F8]) * 100 + int(ram[0x07F9]) * 10 + int(ram[0x07FA]))
     
-    # Player state 0x000E tracks animations (0x0B is dying, 0x06 is falling)
-    # Viewport 0x00B5 tracks vertical screen position (detects falling into pits)
-    is_dying = (ram[0x000E] == 0x0b or ram[0x000E] == 0x06 or ram[0x00B5] > 1)
+    # Death detection: State 0x000E (falling/dying) and vertical viewport (pits)
+    is_dying = (ram[0x000E] in [0x0b, 0x06] or ram[0x00B5] > 1)
     
-    # The flag at 0x0770 changes to 2 when Mario touches the flagpole
+    # Flagpole check at 0x0770
     is_finished = (ram[0x0770] == 2)
     
     return x_pos, time_left, is_dying, is_finished
 ```
 
-This function is critical because standard screen-based rewards are often delayed or inaccurate. By calculating the exact horizontal coordinate (`x_pos`), the environment can provide immediate feedback to the agent for every pixel of progress made. The function also monitors the player's animation state and viewport position to distinguish between a standard jump and a terminal fall, allowing for precise episode termination.
+Using `x_pos` for rewards ensures the agent receives an immediate signal for progress. We also monitor RAM address `0x000E` (animation state) and `0x00B5` (viewport height) to accurately trigger episode resets when Mario falls into a pit or hits an enemy, preventing "phantom" rewards during death animations.
 
 #### Structural Vision Pipeline (`wrappers.py`)
 
-The `preprocess` function implements the structural filtering used in Version 2. It utilizes OpenCV to transform high-dimensional RGB data into a simplified edge-map. This process is designed to highlight the geometry of the level while discarding irrelevant textures.
+The V2 pipeline uses OpenCV to reduce the visual state to its core geometry. By stripping textures and background colors, we isolate the platforms and hitboxes, allowing the neural network to focus on level structure rather than aesthetics.
 
 ```python
 def preprocess(obs):
-    # Masking the sky using the blue channel threshold (BGR index 2)
+    # Mask sky: zero out high-threshold blue pixels
     sky_mask = obs[:, :, 2] > 240
     obs[sky_mask] = 0
 
-    # Crop out the top 40 pixels to hide the score, time, and world text
+    # Crop UI: remove top 40px (score, coins, time)
     obs = obs[40:224, 0:256]
 
-    # Convert to grayscale and apply the Canny Edge Detection algorithm
+    # Edge detection: transform geometry into outlines
     gray = cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
     gray = cv2.Canny(gray, 100, 200)
 
-    # Downsample to 84x84 using INTER_NEAREST to prevent blurring edges
+    # Scale: downsample to 84x84 while maintaining edge sharpness
     resized = cv2.resize(gray, (84, 84), interpolation=cv2.INTER_NEAREST)
     return np.expand_dims(resized, axis=0).astype(np.uint8)
 ```
 
-The pipeline begins by zeroing out sky pixels, which prevents the agent from attempting to find patterns in the background. It then crops the status bar, ensuring the agent does not learn to associate the moving clock or score digits with its actions. The Canny algorithm identifies areas of high intensity gradients, effectively outlining platforms, pipes, and enemies. Finally, the use of `INTER_NEAREST` during resizing is intentional; it preserves the sharp contrast of the edges, which is essential for the convolutional layers to identify boundaries accurately.
+The pipeline handles two main issues:
+1. **Noise Reduction:** Zeroing the sky and cropping the status bar prevents the agent from overfitting to background gradients or the moving clock digits. 
+2. **Feature Extraction:** Canny edge detection identifies high-intensity gradients, effectively "highlighting" enemies and pipes. We use `INTER_NEAREST` during the final resize to keep these 1-pixel wide outlines sharp; standard interpolation would blur the edges and degrade the signal for the CNN.
 
 #### Metric Management and Evaluation (`callbacks.py`)
 
@@ -555,7 +552,7 @@ Using the visual dashboard provides great insight but creates a rendering bottle
 Changing the core settings can easily break the training logic if the numbers do not align mathematically. **PPO Configuration** is handled in `src/agent/config.py` through the `n_steps` and `batch_size` variables. 
 
 **IMPORTANT:**
-To prevent the code from crashing, your configuration must follow this specific math rule:
+To prevent the code from crashing you must follow this:
 ```bash
 (NUM_ENVS * n_steps) must be divisible by batch_size
 ```
@@ -582,32 +579,28 @@ step,elapsed_time_sec,mean_reward,std_reward,mean_x,std_x,peak_x,max_level,win_r
 
 These tracking issues are purely visual and related to the logging script. They do not affect the actual training of the agent or its ability to learn the game. The agent still receives the correct rewards for finishing levels and moving forward even if the CSV file does not record the win percentage correctly.
 
-# Further Improvements
+# Further improvements
 
 **Ablation Study**
-Because Version 2 merges sky masking, cropping, and edge detection into one pipeline, it is currently impossible to determine which specific variable drives the performance gain. We need to isolate these factors in an ablation study to confirm whether the success comes from removing UI noise, background colors, or the structural outlines themselves. Such a study would allow us to simplify the processing pipeline by discarding any steps that do not contribute significantly to the agent's learning efficiency.
+Since Version 2 combines sky masking, UI cropping, and Canny edge detection, we need to isolate these variables. Testing each component individually will reveal whether the performance boost is driven by the structural outlines (Canny) or simply the reduction of background entropy (sky masking).
 
-**Extended Training and Schedules**
-Many Version 2 agents were still showing positive learning trends at the 5 million step cutoff, suggesting that the current training limit is too short to observe full mastery. We should increase this threshold to 10 or 20 million steps to allow the agents to progress into subsequent, more difficult stages of the game. To prevent instability during these longer sessions, we need to implement decaying learning rates and entropy schedules. These adjustments would prevent the model from unlearning successful strategies and ensure the agent transitions from random exploration to confident, consistent execution.
+**Scaling & Learning Schedules**
+The 5-million-step cutoff was too short for V2, as many seeds were still on an upward trajectory. Future runs should extend to 10M–20M steps. To maintain stability over these longer durations, we need to implement decaying learning rates and entropy schedules to prevent the policy from collapsing once the environment is partially solved.
 
-**Generalization Tests**
-Training and evaluating exclusively on Level 1-1 introduces a high risk of level memorization rather than the acquisition of general game-playing skills. To prove that the visual preprocessing creates a versatile agent, we should conduct generalization tests on unfamiliar environments like Level 1-2 or 2-1. Success in these new layouts would demonstrate that the AI has developed a genuine understanding of game objects like pipes and pits. This testing is required to confirm if the preprocessing provides a general visual advantage or if the agent is simply overfitting to a single level.
+**Cross-Level Generalization**
+To ensure the agent isn't just memorizing the coordinates of Level 1-1, we need to run "zero-shot" tests on Level 1-2 or 2-1. Success on unfamiliar layouts would confirm that the structural vision pipeline helps the agent identify *objects* (pipes, pits, Goombas) rather than just overfitting to a single map.
 
-**Evaluation Methods**
-The current non-deterministic evaluation approach introduces unnecessary noise by allowing the agent to take random actions during performance tests. We need to transition to a deterministic policy for all evaluations to capture a true representation of the agent's maximum capability. Selecting the action with the highest predicted value every time removes the variable of random chance, which should lead to more consistent win rates and a fairer comparison between different agent versions.
+**Deterministic Evaluation**
+Our current evaluation uses non-deterministic action selection, which introduces random noise into the performance metrics. Switching to a strictly deterministic policy—where the agent always picks the action with the highest predicted value—will provide a more accurate representation of its true capability and stabilize the win-rate data.
 
-**Computational Optimization**
-The current 15 to 20 percent increase in training time is caused by the CPU handling all image processing tasks across the parallel environments. We should offload sky masking and Canny edge detection to the GPU using tools like Torchvision or PyTorch to remove this bottleneck. Synchronizing the processing speed with the neural network updates would likely bring training times back to baseline levels. This optimization is needed to facilitate more robust research by allowing us to run more seeds and longer training cycles in the same timeframe.
+**GPU-Accelerated Preprocessing**
+The 20% slowdown in V2 is caused by the CPU handling OpenCV filters for 12 parallel environments. Offloading sky masking and Canny detection to the GPU using Torchvision would eliminate this bottleneck and likely bring training speeds back to baseline levels.
 
 # Conclusion
 
-The comparative study demonstrates that visual preprocessing acts as a decisive force multiplier for reinforcement learning agents. Our results confirm that Version 2, which utilized sky masking and Canny edge detection, outperformed the Version 1 baseline in every measured category. The 90.1% increase in average horizontal distance and the 600% increase in level completion rates prove that simplifying the visual input allows the PPO algorithm to focus on game logic rather than low-level image processing.
+Looking at the data, it’s clear that the grayscale baseline (V1) struggled to make sense of the game's background noise. By stripping out the sky and using edge detection in V2, we bypassed the part where the CNN has to learn basic feature extraction from scratch. This significantly sped up the learning process and helped the agent converge on a winning strategy much sooner.
 
-From a scientific perspective, the success of Version 2 is due to how Convolutional Neural Networks operate. In standard training, the first few million environment interactions are spent developing internal filters to identify edges and shapes. By providing the agent with pre-calculated outlines through the Canny algorithm, we removed this hurdle. This allowed the neural network to immediately utilize its capacity for high-level decision-making, such as navigation and enemy avoidance. Furthermore, zeroing out the blue sky masked approximately 60% of the pixels that would otherwise act as static noise, significantly cleaning the training signal.
-
-The study also highlights the importance of multi-seed testing in reinforcement learning research. While Version 2 showed higher variance between seeds, the worst-performing experimental seed still achieved a better average distance than the best-performing baseline seed. This indicates that while the preprocessing pipeline is sensitive to initial random states, its performance floor is still significantly higher than traditional grayscale methods.
-
-In summary, this project provides a successful proof of concept for using simple computer vision techniques to accelerate deep learning. For systems with limited hardware or time constraints, visual feature engineering is a cost-effective and powerful alternative to simply increasing training duration. The findings suggest that future research into complex visual environments should prioritize cleaning the observation space before initiating the training process.
+Even though V2 had more "swing" between different seeds, the performance floor was much higher across the board. The fact that the weakest V2 agent still outperformed the top V1 agent shows that the vision pipeline is doing most of the heavy lifting. The main takeaway here is that manual feature engineering still has a huge place in Reinforcement Learning, especially when you are limited by hardware or time.
 
 # License
 This project is licensed under the MIT License. You are free to use, copy, and modify the software for any purpose.
